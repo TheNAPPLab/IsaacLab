@@ -1,0 +1,18 @@
+    {
+      "prim_path": "/World/ground/terrain/S_TrafficCone_2",
+      "object_name": "traffic_cone",
+      "semantic_tags": [
+        {
+          "type": "class",
+          "value": "traffic_cone"
+        },
+        {
+          "type": "color", 
+          "value": "orange"
+        },
+        {
+          "type": "category",
+          "value": "obstacle"
+        }
+      ]
+    },

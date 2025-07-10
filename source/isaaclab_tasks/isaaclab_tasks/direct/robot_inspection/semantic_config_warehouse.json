@@ -1,0 +1,29 @@
+{
+  "semantic_objects": [
+    {
+      "prim_path": "/World/ground/terrain/forklift",
+      "object_name": "forklift",
+      "semantic_tags": [
+        {
+          "type": "class",
+          "value": "forklift"
+        },
+        {
+          "type": "color",
+          "value": "yellow"
+        },
+        {
+          "type": "category", 
+          "value": "vehicle"
+        },
+        {
+          "type": "size",
+          "value": "large"
+        }
+      ]
+    }
+  ],
+  "camera_filters": [
+    "class:forklift"
+  ]
+}
