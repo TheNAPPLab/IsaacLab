@@ -19,7 +19,7 @@ from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.math import sample_uniform
 
-from inspection_cfg import Isaac3dinspectionEnvCfg
+from .inspection_cfg import Isaac3dinspectionEnvCfg
 from isaaclab.terrains import TerrainImporter
 from isaaclab.sensors import TiledCamera, save_images_to_file
 import isaacsim.core.utils.stage as stage_utils
@@ -29,6 +29,7 @@ try:
     import Semantics
 except ModuleNotFoundError:
     from pxr import Semantics
+# ./isaaclab.sh -p scripts/reinforcement_learning/skrl/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless --video
 
 debug = False
 #./isaaclab.sh -p scripts/reinforcement_learning/sb3/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless
