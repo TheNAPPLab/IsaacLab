@@ -67,7 +67,7 @@ def main():
             # apply actions
             obs, rewards, terminated, truncated, info  = env.step(actions)
             obs_v = obs['policy']
-            print(f"obs shape: {obs_v.shape}")
+
 
     # close the simulator
     env.close()

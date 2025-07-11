@@ -12,12 +12,20 @@ To run Training with SKRL
 ```
 ./isaaclab.sh -p scripts/reinforcement_learning/skrl/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless --video
 ```
+View training Logs
+```
+./isaaclab.sh -p -m tensorboard.main --logdir logs/skrl/3DInspection_direct
+```
 
+View Trained Trajectory
+```
+./isaaclab.sh -p scripts/reinforcement_learning/skrl/play.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --use_last_checkpoint
+```
 
 # Reward Design
 # First Version
 Simple Reward function
-$reward = -a*distance + b *Number of Segementation pixels in camera view$
+$reward = \alpha * \frac{1}{1+d} + \beta * \text{Number of Segementation pixels in camera view}$
 
 Drive the reward to a goal and capture the pixels.
 

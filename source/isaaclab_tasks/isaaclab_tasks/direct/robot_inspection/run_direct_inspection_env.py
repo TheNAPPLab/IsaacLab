@@ -38,7 +38,8 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 import isaaclab_tasks 
 import torch
-
+from inspection_cfg import Isaac3dinspectionEnvCfg
+from inspection_env import Isaac3dinspectionEnv
 
 def main():
     """Main function."""
@@ -60,17 +61,14 @@ def main():
     count = 0
     while simulation_app.is_running():
         with torch.inference_mode():
-            # Reset every 1000 steps (shorter for cartpole's 5-second episodes)
-            if count % 1000 == 0:
-                count = 0
-                env.reset()
-                print("-" * 80)
-                print("[INFO]: Resetting environment...")
-            
+
             actions = torch.randint(0, env.action_space.nvec[0]+1, (env.num_envs,), device=env.device)
 
             # Step the environment
             obs, rewards, terminated, truncated, info = env.step(actions)
+            if terminated.any() or truncated.any():
+                env.reset()
+                print("[INFO]: Some environments were reset.")
 
             if local_args["display_feed"]:
                 camera_data = env.scene["camera"].data

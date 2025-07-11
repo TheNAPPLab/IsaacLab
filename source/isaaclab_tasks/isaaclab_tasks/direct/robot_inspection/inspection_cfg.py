@@ -10,7 +10,7 @@ from isaaclab.envs.utils import spaces
 from isaaclab.sensors.camera import tiled_camera
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg
-from isaaclab.envs import DirectRLEnvCfg
+from isaaclab.envs import DirectRLEnvCfg, ViewerCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
@@ -37,17 +37,18 @@ ROBOT_CONFIGS = {
 @configclass
 class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     # env
-    decimation = 8
+    decimation = 4
     semantic_config_path = "source/isaaclab_tasks/isaaclab_tasks/direct/robot_inspection/semantic_config_warehouse.json"
-    episode_length_s = 1000.0
+    episode_length_s = 30
     action_scale = 2.0  # [N]
     action_space = Discrete(3)
 
     state_space = 0
-    wheel_velocity_scale = 2
+    wheel_velocity_scale = 5.0
 
     # simulation
-    sim: SimulationCfg = SimulationCfg(dt=1 / 120, render_interval=decimation)
+    sim: SimulationCfg = SimulationCfg(dt= 1 / 120, render_interval=decimation)
+    # viewer = ViewerCfg(eye=(0, 0, 12.0), lookat=(0, 0, 0))
 
     # robot
     robot_cfg: ArticulationCfg = ArticulationCfg(
@@ -68,8 +69,8 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     tiled_camera = TiledCameraCfg(
         prim_path="/World/envs/env_.*/Robot/base_link/front_camera",
         update_period=0.1,
-        height=100,
-        width=100,
+        height=480,
+        width=480,
         data_types=["rgb", "semantic_segmentation", "instance_segmentation_fast"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0,
@@ -85,8 +86,9 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         semantic_filter=SemanticManager.get_semantic_filter_from_config(semantic_config_path),
         colorize_semantic_segmentation=True,  # Raw data for processing
         # colorize_instance_segmentation=True,
-        debug_vis=True  # Disable for performance
+        debug_vis=False  # Disable for performance
     )
+    viewer = ViewerCfg( eye=(5.0, -21.0, 5.0), lookat=(-15, 10, 1.0))
     observation_space = spaces.Box(
             low=float("-inf"), high=float("inf"), shape=(tiled_camera.height, tiled_camera.width, 3)
     )
@@ -104,8 +106,8 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     max_robot_distance = 2000
 
     #reward
-    forklift_reward_scale = 3.0  # Scale for forklift coverage reward
-    distance_reward_scale = 0.1  # Scale for distance-based rewards
+    forklift_reward_scale = 1.0  # Scale for forklift coverage reward
+    distance_reward_scale = 0.5  # Scale for distance-based rewards
 
     save_inspection_images = True       # Whether to save images of good inspections
     inspection_threshold = 0.25         # Coverage % threshold to count as valid inspection

@@ -29,8 +29,14 @@ try:
     import Semantics
 except ModuleNotFoundError:
     from pxr import Semantics
+#View logs
+# execute from the root directory of the repository
+# ./isaaclab.sh -p -m tensorboard.main --logdir logs/skrl/3DInspection_direct
+#Train
 # ./isaaclab.sh -p scripts/reinforcement_learning/skrl/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless --video
-
+#PLAY
+## execute from the root directory of the repository
+# ./isaaclab.sh -p scripts/reinforcement_learning/skrl/play.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --use_last_checkpoint
 debug = False
 
 class Isaac3dinspectionEnv(DirectRLEnv):
@@ -242,8 +248,8 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         distance = torch.norm(robot_pos - self.objective_position[:2])
         
         #consider only giving a reward when within a certain distance
-        if distance > 5.0:
-            distance = -distance
+        if distance > 2.0:
+            distance = 1/(0.1 + distance)  # Inverse distance for reward
             distance_reward = self.cfg.distance_reward_scale * distance.item()
         return distance_reward
 
@@ -254,7 +260,7 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         rewards = torch.zeros(self.num_envs, device=self.device)
         env_ids = self.robot._ALL_INDICES
         detection_results = self.detect_semantic_objects()
-        reward = -0.1 
+        reward = 0
 
         if detection_results['forklift'].get('visible'):
             coverage = detection_results['forklift'].get('coverage_percentage', 0)
@@ -295,8 +301,8 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         new_pos = torch.zeros((num_resets, 3), device=self.device)
         # new_pos[:, 0] = 0.0  # Fixed X position
         # new_pos[:, 1] = 0.0  # Fixed Y position  
-        new_pos[:, 0] = -24.0  # Fixed X position
-        new_pos[:, 1] = 15.0  # Fixed Y position  
+        new_pos[:, 0] = -12  # Fixed X position
+        new_pos[:, 1] = 0.0  # Fixed Y position  
         new_pos[:, 2] = 0.01  # Fixed Z position (adjust height as needed)
         
         # Set FIXED robot velocity (usually zero for consistent start)
