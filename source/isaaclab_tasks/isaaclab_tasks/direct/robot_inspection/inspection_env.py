@@ -24,7 +24,7 @@ from isaaclab.terrains import TerrainImporter
 from isaaclab.sensors import TiledCamera, save_images_to_file
 import isaacsim.core.utils.stage as stage_utils
 import cv2
-from semantic_manager import SemanticManager, add_semantic_tags_from_config
+from .semantic_manager import SemanticManager, add_semantic_tags_from_config
 try:
     import Semantics
 except ModuleNotFoundError:
@@ -32,7 +32,7 @@ except ModuleNotFoundError:
 # ./isaaclab.sh -p scripts/reinforcement_learning/skrl/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless --video
 
 debug = False
-#./isaaclab.sh -p scripts/reinforcement_learning/sb3/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless
+
 class Isaac3dinspectionEnv(DirectRLEnv):
     cfg: Isaac3dinspectionEnvCfg
 
@@ -227,10 +227,8 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         rgb_data = self._tiled_camera.data.output.get("rgb")
         if rgb_data is not None:
             rgb_img = rgb_data/255.0  # Shape: [H, W, 4] (RGBA)
-            # Convert to RGB and resize
-            rgb_img = rgb_img[:, :, :3]
             #normalise 
-            mean_tensor = torch.mean(rgb_img, dim=(0, 1), keepdim=True)
+            mean_tensor = torch.mean(rgb_img, dim=(1, 2), keepdim=True)
             rgb_img -= mean_tensor
             # rgb_img = torch.nn.functional.interpolate(rgb_img.permute(2,0,1).unsqueeze(0), size=(64, 64)).squeeze(0).permute(1,2,0)
             observations = {"policy": rgb_img.clone()}

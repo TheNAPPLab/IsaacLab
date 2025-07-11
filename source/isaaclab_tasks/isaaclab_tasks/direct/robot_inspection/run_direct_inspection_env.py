@@ -36,13 +36,9 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
-
+import isaaclab_tasks 
 import torch
 
-# Import your custom environment
-from inspection_cfg import Isaac3dinspectionEnvCfg
-from inspection_env import Isaac3dinspectionEnv
-action_type = 'discrete'  # 'discrete' or 'continuous'
 
 def main():
     """Main function."""

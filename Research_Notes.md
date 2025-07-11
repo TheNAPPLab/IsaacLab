@@ -4,10 +4,15 @@ The source files are located in
 source/isaaclab_tasks/isaaclab_tasks/direct/robot_inspection
 ```
 
-To run a basic interactive file for debuging and visualing run
+To run a basic interactive file for debuging and visualing run (I broke it lol)
 ```
 source/isaaclab_tasks/isaaclab_tasks/direct/robot_inspection/run_direct_rl_env.py
 ```
+To run Training with SKRL
+```
+./isaaclab.sh -p scripts/reinforcement_learning/skrl/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless --video
+```
+
 
 # Reward Design
 # First Version

@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 
+from isaaclab.envs.utils import spaces
+from isaaclab.sensors.camera import tiled_camera
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg
 from isaaclab.envs import DirectRLEnvCfg
@@ -18,8 +20,8 @@ from isaaclab.terrains import TerrainImporterCfg
 from gymnasium.spaces.discrete import Discrete
 # from isaaclab.sensors.camera import CameraCfg
 from isaaclab.sensors import TiledCameraCfg
-from semantic_manager import SemanticManager
-
+from .semantic_manager import SemanticManager
+from gymnasium import spaces
 ROBOT_CONFIGS = {
     "jackal": {
         "usd_path": f"{ISAAC_NUCLEUS_DIR}/Robots/Clearpath/Jackal/jackal_basic.usd",
@@ -66,8 +68,8 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     tiled_camera = TiledCameraCfg(
         prim_path="/World/envs/env_.*/Robot/base_link/front_camera",
         update_period=0.1,
-        height=480,
-        width=640,
+        height=100,
+        width=100,
         data_types=["rgb", "semantic_segmentation", "instance_segmentation_fast"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0,
@@ -85,14 +87,17 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         # colorize_instance_segmentation=True,
         debug_vis=True  # Disable for performance
     )
-    observation_space = [tiled_camera.height, tiled_camera.width, 3]
+    observation_space = spaces.Box(
+            low=float("-inf"), high=float("inf"), shape=(tiled_camera.height, tiled_camera.width, 3)
+    )
+
     terrain_cfg: TerrainImporterCfg = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="usd",
         usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Warehouse/full_warehouse.usd",
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(),
-        debug_vis=False,
+        debug_vis=True,
     )
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=1, env_spacing=4.0, replicate_physics=True)
@@ -108,5 +113,4 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
 
     terminate_on_all_inspected = True
     min_episode_length = 1000
-    image_observation_size = (64, 64)
     include_robot_state = True
