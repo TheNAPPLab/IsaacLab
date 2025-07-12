@@ -34,7 +34,7 @@ class RayCasterCamera(RayCaster):
     Warp meshes only.
 
     Currently, only the following annotators are supported:
-
+    # Modfied new type
     - ``"distance_to_camera"``: An image containing the distance to camera optical center.
     - ``"distance_to_image_plane"``: An image containing distances of 3D points from camera plane along camera's z-axis.
     - ``"normals"``: An image containing the local surface normal vectors at each pixel.
@@ -277,7 +277,7 @@ class RayCasterCamera(RayCaster):
 
         # TODO: Make ray-casting work for multiple meshes?
         # necessary for regular dictionaries.
-        self.ray_hits_w, ray_depth, ray_normal, _ = raycast_mesh(
+        self.ray_hits_w, ray_depth, ray_normal, ray_face_id = raycast_mesh(
             ray_starts_w,
             ray_directions_w,
             mesh=self.meshes[self.cfg.mesh_prim_paths[0]],
@@ -286,6 +286,7 @@ class RayCasterCamera(RayCaster):
                 [name in self.cfg.data_types for name in ["distance_to_image_plane", "distance_to_camera"]]
             ),
             return_normal="normals" in self.cfg.data_types,
+            return_face_id = "face_ids" in self.cfg.data_types
         )
         # update output buffers
         if "distance_to_image_plane" in self.cfg.data_types:
@@ -316,6 +317,9 @@ class RayCasterCamera(RayCaster):
 
         if "normals" in self.cfg.data_types:
             self._data.output["normals"][env_ids] = ray_normal.view(-1, *self.image_shape, 3)
+
+        if "face_ids" in self.cfg.data_types:
+            self._data.output["face_ids"][env_ids] = ray_face_id.view(-1, *self.image_shape, 1)
 
     def _debug_vis_callback(self, event):
         # in case it crashes be safe
@@ -362,6 +366,8 @@ class RayCasterCamera(RayCaster):
                 shape = (self.cfg.pattern_cfg.height, self.cfg.pattern_cfg.width, 1)
             elif name in ["normals"]:
                 shape = (self.cfg.pattern_cfg.height, self.cfg.pattern_cfg.width, 3)
+            elif name in ["face_ids"]:
+                shape = (self.cfg.pattern_cfg.height, self.cfg.pattern_cfg.width, 1)
             else:
                 raise ValueError(f"Received unknown data type: {name}. Please check the configuration.")
             # allocate tensor to store the data
