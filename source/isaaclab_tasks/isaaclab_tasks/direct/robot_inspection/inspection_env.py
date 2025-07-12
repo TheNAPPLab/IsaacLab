@@ -248,8 +248,8 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         distance = torch.norm(robot_pos - self.objective_position[:2])
         
         #consider only giving a reward when within a certain distance
-        if distance > 2.0:
-            distance = 1/(0.1 + distance)  # Inverse distance for reward
+        if distance > 1.0:
+            distance = 1/(0.0001 + distance)  # Inverse distance for reward
             distance_reward = self.cfg.distance_reward_scale * distance.item()
         return distance_reward
 

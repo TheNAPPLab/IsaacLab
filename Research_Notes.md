@@ -42,12 +42,18 @@ we rewrote the segemantaion name for the forklift
 ![Single Robot/Env](Images/multi_robot.png)
 
 # Things to add
+- [ ] Collsion detection and penalty Reward
+- [ ] Integrate occupancy Map, compare perfomance to pure camera Input to the inspection problem
+- [ ] Integrate ROS (feels like I might most of the tools I need for now)
+- [ ]Get Multi Envs working (PRIORITY -SPEED TRAINING)
+- [x] Mechanism to label my own Segmentaion categories in the Simulation
 - [ ] Different Inspection goals (Fire extinguisher, Traffic cone)
 - [ ] Some Goal oriented setup, randomise the inspection goal and give as an input the image of the goal
 - [ ] Randomise the starting pose of the robot as well as potentially the Goals
 - [ ] Better Mesh environments to experiment on, environment is in ROWS not ideal or interesting maybe find from Fab.com or build ourselves.
-- [ ] Integrate with the training PPO environments
+- [x] Integrate with the training PPO environments
 - [ ] 3D reconstrunction setup and reward for inspection quality and coverage( Gaussian Splatting)
 - [ ] Surface normal counting as coverage function ( massk image trajectory with segmantics )
-
+- [ ] Camera Actuator seperate from Robot Actuator ( SImulatre Panning ant tilting) ( Not priority)
+- [x] Integrate with WANDB to allow collaborators to view Training results
 

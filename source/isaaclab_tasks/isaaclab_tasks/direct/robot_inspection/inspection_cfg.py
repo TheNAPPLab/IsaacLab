@@ -39,7 +39,7 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     # env
     decimation = 4
     semantic_config_path = "source/isaaclab_tasks/isaaclab_tasks/direct/robot_inspection/semantic_config_warehouse.json"
-    episode_length_s = 30
+    episode_length_s = 35
     action_scale = 2.0  # [N]
     action_space = Discrete(3)
 
@@ -69,8 +69,8 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     tiled_camera = TiledCameraCfg(
         prim_path="/World/envs/env_.*/Robot/base_link/front_camera",
         update_period=0.1,
-        height=480,
-        width=480,
+        height=64,
+        width=64,
         data_types=["rgb", "semantic_segmentation", "instance_segmentation_fast"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0,
@@ -106,7 +106,7 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     max_robot_distance = 2000
 
     #reward
-    forklift_reward_scale = 1.0  # Scale for forklift coverage reward
+    forklift_reward_scale = 5.0  # Scale for forklift coverage reward
     distance_reward_scale = 0.5  # Scale for distance-based rewards
 
     save_inspection_images = True       # Whether to save images of good inspections
