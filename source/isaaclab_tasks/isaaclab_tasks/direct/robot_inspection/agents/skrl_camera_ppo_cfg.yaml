@@ -86,6 +86,8 @@ agent:
     experiment_name: "exp_1"
     write_interval: auto
     checkpoint_interval: auto
+    wandb: True
+
 
 
 # Sequential trainer
