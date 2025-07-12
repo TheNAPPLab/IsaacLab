@@ -63,7 +63,7 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
                 stiffness=None
             )
         },
-        debug_vis=True
+        debug_vis=False
     
     )
     tiled_camera = TiledCameraCfg(
@@ -99,14 +99,14 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Warehouse/full_warehouse.usd",
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(),
-        debug_vis=True,
+        debug_vis=False,
     )
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=1, env_spacing=4.0, replicate_physics=True)
     max_robot_distance = 2000
 
     #reward
-    forklift_reward_scale = 5.0  # Scale for forklift coverage reward
+    forklift_reward_scale = 1.0  # Scale for forklift coverage reward
     distance_reward_scale = 0.5  # Scale for distance-based rewards
 
     save_inspection_images = True       # Whether to save images of good inspections
