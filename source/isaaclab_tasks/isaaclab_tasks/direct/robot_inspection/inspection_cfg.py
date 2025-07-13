@@ -19,7 +19,7 @@ from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.terrains import TerrainImporterCfg
 from gymnasium.spaces.discrete import Discrete
 # from isaaclab.sensors.camera import CameraCfg
-from isaaclab.sensors import TiledCameraCfg, RayCasterCameraCfg
+from isaaclab.sensors import TiledCameraCfg, RayCasterCameraCfg, patterns
 from .semantic_manager import SemanticManager
 from gymnasium import spaces
 ROBOT_CONFIGS = {
@@ -37,6 +37,7 @@ ROBOT_CONFIGS = {
 @configclass
 class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     # env
+    _width, _height = 100, 100
     decimation = 4
     semantic_config_path = "source/isaaclab_tasks/isaaclab_tasks/direct/robot_inspection/semantic_config_warehouse.json"
     episode_length_s = 35
@@ -66,16 +67,28 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         debug_vis=False
     
     )
-    raycast_camera = RayCasterCameraCfg(
-        prim_path="/World/envs/env_.*/Robot/base_link/raycast_camera",
+    raycaster_camera_cfg = RayCasterCameraCfg(
+        prim_path="/World/envs/env_.*/Robot/base_link",
         update_period=0.1,
-        data_types=["face_id"],
-    )
+        data_types=["face_ids"],
+        offset=RayCasterCameraCfg.OffsetCfg(
+            pos=(0.3, 0.0, 0.15),
+            rot=(-0.5, 0.5, -0.5, 0.5),
+            convention="ros"
+        ),
+        pattern_cfg= patterns.PinholeCameraPatternCfg(
+            height=_height,
+            width=_width,
+            focal_length=24.0,
+            horizontal_aperture=20.955,
+        ),
+        mesh_prim_paths = ["/World/ground/terrain/forklift"]
+    ) 
     tiled_camera = TiledCameraCfg(
         prim_path="/World/envs/env_.*/Robot/base_link/front_camera",
         update_period=0.1,
-        height=64,
-        width=64,
+        height=100,
+        width=100,
         # data_types=["rgb", "semantic_segmentation", "instance_segmentation_fast"],
         data_types=["rgb"],
         spawn=sim_utils.PinholeCameraCfg(

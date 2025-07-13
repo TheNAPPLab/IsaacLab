@@ -372,7 +372,10 @@ class RayCasterCamera(RayCaster):
             else:
                 raise ValueError(f"Received unknown data type: {name}. Please check the configuration.")
             # allocate tensor to store the data
-            self._data.output[name] = torch.zeros((self._view.count, *shape), device=self._device)
+            if name == "face_ids":
+                self._data.output[name] = torch.zeros((self._view.count, *shape), dtype=torch.int32, device=self._device)
+            else:
+                self._data.output[name] = torch.zeros((self._view.count, *shape), device=self._device)
 
     def _compute_intrinsic_matrices(self):
         """Computes the intrinsic matrices for the camera based on the config provided."""

@@ -59,6 +59,7 @@ def main():
     
     # Simulate physics
     count = 0
+    env.reset()
     while simulation_app.is_running():
         with torch.inference_mode():
 
@@ -104,6 +105,33 @@ def main():
                         grid_image[y_start:y_end, x_start:x_end] = img_bgr
                     
                     cv2.imshow("All RGB Camera Feeds", grid_image)
+                raycast_data = env.scene["raycaster_camera"].data
+                face_id_data = raycast_data.output.get("face_ids")
+                if face_id_data is not None:
+                    # Get face IDs for first environment
+                    face_ids = face_id_data[0].cpu().numpy().squeeze()  # Shape: (64, 64)
+                    
+                    # Create colored visualization
+                    face_vis = np.zeros((100, 100, 3), dtype=np.uint8)
+                    
+                    # Color pixels that aren't -1
+                    valid_mask = face_ids != -1
+                    face_vis[valid_mask] = [0, 255, 0]  # Green for detected faces
+                    face_vis[~valid_mask] = [0, 0, 0]   # Black for no detection
+                    
+                    # Scale up for better visibility
+                    face_vis_large = cv2.resize(face_vis, (256, 256), interpolation=cv2.INTER_NEAREST)
+                    
+                    # Add text overlay
+                    cv2.putText(face_vis_large, f"Face IDs (Green=Hit)", (10, 30), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    
+                    # Count valid detections
+                    valid_count = np.sum(valid_mask)
+                    cv2.putText(face_vis_large, f"Valid pixels: {valid_count}", (10, 60), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    
+                    cv2.imshow("Face ID Detection", face_vis_large)
 
             
 
@@ -118,11 +146,11 @@ def main():
             #         img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
             #         cv2.imshow("Live Camera Feed", img_bgr)
 
-                semantic_image = camera_data.output.get("semantic_segmentation")
-                if semantic_image is not None:
-                    img_np = semantic_image[0].cpu().numpy()
-                    img_bgra = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGRA)
-                    cv2.imshow("Live Semantic Feed", img_bgra)
+                # semantic_image = camera_data.output.get("semantic_segmentation")
+                # if semantic_image is not None:
+                #     img_np = semantic_image[0].cpu().numpy()
+                #     img_bgra = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGRA)
+                #     cv2.imshow("Live Semantic Feed", img_bgra)
 
                 cv2.waitKey(1)
             

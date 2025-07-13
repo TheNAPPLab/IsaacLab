@@ -16,3 +16,76 @@
         }
       ]
     },
+
+
+
+  # semantic_info = self._tiled_camera.data.info.get("semantic_segmentation")
+        # if semantic_info is None:
+        #     return {}
+        # self.semantic_buffer.copy_(semantic_info)
+
+        # if not semantic_info or "idToLabels" not in semantic_info:
+        #     return detection_results  # Skip if no mapping info for this environment
+        # id_to_labels = semantic_info["idToLabels"]
+
+        # class_to_color = {}
+
+        # for color_str, label_dict in id_to_labels.items():
+        #     class_name = label_dict.get("class")
+        #     if class_name:
+        #         # The key is a string "(R, G, B, A)", convert it to a tuple of numbers
+        #         color_tuple = eval(color_str)
+        #         # Create a tensor for the color, matching the image's data type (usually uint8)
+        #         color_tensor = torch.tensor(color_tuple, dtype=torch.uint8, device=self.device)
+        #         class_to_color[class_name] = color_tensor
+
+        # # 4. For each target object, check for its color in the image
+        # for object_name in self.target_object_names:
+        #     target_color = class_to_color.get(object_name)
+
+        #     # Proceed only if the target object was found in the color map
+        #     if target_color is not None:
+        #         # Create a boolean mask where the image pixel color matches the target color.
+        #         # torch.all() checks for equality across the RGBA channel dimension.
+        #         mask = torch.all(image_data == target_color, dim=-1)
+        #         pixel_count = torch.sum(mask).item()
+
+        #         if pixel_count > 0:
+        #             total_pixels = mask.numel()
+        #             coverage_percentage = (pixel_count / total_pixels) * 100
+
+        #             # Update the results with the found data
+        #             detection_results[object_name] = {
+        #                 'visible': True,
+        #                 'pixel_count': pixel_count,
+        #                 'coverage_percentage': coverage_percentage,
+        #                 'bbox': None
+        #             }
+
+        # return detection_results
+
+
+
+       # if detection_results['forklift'].get('visible'):
+        #     coverage = detection_results['forklift'].get('coverage_percentage', 0)
+        #     coverage_reward = self.cfg.forklift_reward_scale * coverage
+        #     reward += coverage_reward
+        # Add distance-based reward to uninspected objects
+
+
+         def detect_semantic_objects(self) -> dict:
+        """
+        Detect semantic objects in the current camera view.
+        
+        Returns:
+            Dictionary with detection results for each target object
+        """
+        rewards = torch.zeros(self.num_envs, device=self.device)
+        face_id_data = self._raycaster_camera.data.output.get("face_ids")
+        if face_id_data is not None:
+            self.face_ids_buffer.copy_(face_id_data)
+            del face_id_data
+            discovery_reward = self._compute_face_discovery_reward()
+            rewards += discovery_reward
+        distance_reward = self._get_distance_reward()
+        rewards[0] += distance_reward

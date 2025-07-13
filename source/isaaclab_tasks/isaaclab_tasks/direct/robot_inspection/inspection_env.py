@@ -21,9 +21,8 @@ from isaaclab.utils.math import sample_uniform
 
 from .inspection_cfg import Isaac3dinspectionEnvCfg
 from isaaclab.terrains import TerrainImporter
-from isaaclab.sensors import TiledCamera, save_images_to_file
+from isaaclab.sensors import TiledCamera, RayCasterCamera
 import isaacsim.core.utils.stage as stage_utils
-import cv2
 from .semantic_manager import SemanticManager, add_semantic_tags_from_config
 try:
     import Semantics
@@ -96,6 +95,20 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         # If you add semantic detection back later:
         self.semantic_buffer = torch.zeros((num_envs, height, width, 4), 
                                           dtype=torch.uint8, device=self.device)
+        self.max_face_ids = 10000 
+        self.discovered_faces_buffer = torch.zeros(self.num_envs, self.max_face_ids,
+                                                    dtype=torch.bool, device=self.device)
+        self.total_faces_discovered = torch.zeros(self.num_envs, 
+                                                  dtype=torch.int32, device=self.device)
+        self.face_ids_buffer = torch.zeros((num_envs, height, width, 1), 
+                                          dtype=torch.int32, device=self.device)
+        self.face_flat_buffer = torch.zeros((num_envs, height * width), 
+                                       dtype=torch.int32, device=self.device)
+        self.valid_mask_buffer = torch.zeros((num_envs, height * width), 
+                                        dtype=torch.bool, device=self.device)
+        self.newly_discovered_count = torch.zeros(num_envs, dtype=torch.int32, device=self.device)
+        self.face_rewards = torch.zeros(num_envs, dtype=torch.float32, device=self.device)
+
     def _setup_semantics(self):
         """Setup semantic tags using the semantic manager."""
         try:
@@ -116,88 +129,6 @@ class Isaac3dinspectionEnv(DirectRLEnv):
                 print("Continuing without semantic tags...")
             pass
 
-    def detect_semantic_objects(self) -> dict:
-        """
-        Detect semantic objects in the current camera view.
-        
-        Returns:
-            Dictionary with detection results for each target object
-        """
-
-        detection_results = { 
-            name: {'visible': False, 'pixel_count': 0, 'coverage_percentage': 0.0, 'bbox': None}
-                for name in self.target_object_names
-        }
-
-        semantic_info = self._tiled_camera.data.info.get("semantic_segmentation")
-        if semantic_info is None:
-            return {}
-        # self.semantic_buffer.copy_(semantic_info)
-
-        # if not semantic_info or "idToLabels" not in semantic_info:
-        #     return detection_results  # Skip if no mapping info for this environment
-        # id_to_labels = semantic_info["idToLabels"]
-
-        # class_to_color = {}
-
-        # for color_str, label_dict in id_to_labels.items():
-        #     class_name = label_dict.get("class")
-        #     if class_name:
-        #         # The key is a string "(R, G, B, A)", convert it to a tuple of numbers
-        #         color_tuple = eval(color_str)
-        #         # Create a tensor for the color, matching the image's data type (usually uint8)
-        #         color_tensor = torch.tensor(color_tuple, dtype=torch.uint8, device=self.device)
-        #         class_to_color[class_name] = color_tensor
-
-        # # 4. For each target object, check for its color in the image
-        # for object_name in self.target_object_names:
-        #     target_color = class_to_color.get(object_name)
-
-        #     # Proceed only if the target object was found in the color map
-        #     if target_color is not None:
-        #         # Create a boolean mask where the image pixel color matches the target color.
-        #         # torch.all() checks for equality across the RGBA channel dimension.
-        #         mask = torch.all(image_data == target_color, dim=-1)
-        #         pixel_count = torch.sum(mask).item()
-
-        #         if pixel_count > 0:
-        #             total_pixels = mask.numel()
-        #             coverage_percentage = (pixel_count / total_pixels) * 100
-
-        #             # Update the results with the found data
-        #             detection_results[object_name] = {
-        #                 'visible': True,
-        #                 'pixel_count': pixel_count,
-        #                 'coverage_percentage': coverage_percentage,
-        #                 'bbox': None
-        #             }
-
-        return detection_results
-    
-    def _save_inspection_image(self, env_idx: int, object_name: str, coverage: float):
-        """Save inspection image when coverage threshold is met."""
-        if not self.cfg.save_inspection_images:
-            return
-            
-        try:
-            rgb_data = self._tiled_camera.data.output.get("rgb")
-            if rgb_data is not None:
-                rgb_image = rgb_data[env_idx].cpu().numpy()
-                
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"inspection_{object_name}_env{env_idx}_{coverage:.1f}pct_{timestamp}.png"
-                filepath = os.path.join(self.cfg.inspection_save_dir, filename)
-                
-                # Convert RGBA to RGB for saving
-                rgb_image_save = cv2.cvtColor(rgb_image, cv2.COLOR_RGBA2RGB)
-                cv2.imwrite(filepath, rgb_image_save)
-                if debug:
-                    print(f"📸 Saved inspection image: {filename}")
-                
-        except Exception as e:
-            if debug:
-                print(f"Failed to save inspection image: {e}")
-
     def _setup_scene(self):
         #Add robot, camera and terain to the scene
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -205,6 +136,9 @@ class Isaac3dinspectionEnv(DirectRLEnv):
 
         self._tiled_camera = TiledCamera(self.cfg.tiled_camera)
         self.scene.sensors["camera"] = self._tiled_camera
+
+        self._raycaster_camera = RayCasterCamera(self.cfg.raycaster_camera_cfg)
+        self.scene.sensors["raycaster_camera"] = self._raycaster_camera
 
         self.cfg.terrain_cfg.num_envs = self.scene.cfg.num_envs
         self.cfg.terrain_cfg.env_spacing = self.scene.cfg.env_spacing
@@ -253,7 +187,36 @@ class Isaac3dinspectionEnv(DirectRLEnv):
             torch.sub(self.rgb_buffer, self.mean_buffer, out=self.obs_buffer)
             observations = {"policy": self.obs_buffer.clone()}
         return observations
+
+    def _compute_face_discovery_reward(self):
+        self.face_rewards.zero_()
+        face_id_data = self._raycaster_camera.data.output.get("face_ids")
+        if face_id_data is None:
+           return self.face_rewards
+        self.face_ids_buffer.copy_(face_id_data)
+        del face_id_data
+        batch_size = self.num_envs
+        height, width = self.face_ids_buffer.shape[1], self.face_ids_buffer.shape[2]
+        self.face_flat_buffer.copy_(self.face_ids_buffer.view(batch_size, -1))
+        torch.logical_and(
+            self.face_flat_buffer >= 0,
+            self.face_flat_buffer < self.max_face_ids,
+            out=self.valid_mask_buffer
+        )
+        for env_idx in range(batch_size):
+            valid_ids = self.face_flat_buffer[env_idx][self.valid_mask_buffer[env_idx]]
+            if valid_ids.numel() > 0:
+                unique_ids = torch.unique(valid_ids)
+                already_discovered_mask = self.discovered_faces_buffer[env_idx, unique_ids]
+                newly_discovered_ids = unique_ids[~already_discovered_mask]
+                if newly_discovered_ids.numel() > 0:
+                    self.newly_discovered_count[env_idx] = newly_discovered_ids.numel()
+                    self.discovered_faces_buffer[env_idx, newly_discovered_ids] = True
     
+        # OPTIMIZATION 8: Batch reward calculation
+        self.face_rewards.copy_(self.newly_discovered_count.float())
+        return self.face_rewards
+       
     def _get_distance_reward(self) -> float:
         """NEW: Calculate distance-based reward to uninspected objects."""
         robot_pos = self.robot_pos[:, :2]  # x, y position
@@ -265,32 +228,19 @@ class Isaac3dinspectionEnv(DirectRLEnv):
             distance = 1/(0.0001 + distance)  # Inverse distance for reward
             distance_reward = self.cfg.distance_reward_scale * distance.item()
         return distance_reward
-
-    def get_semantic_reward(self) -> torch.Tensor:
-        """
-        Calculate rewards based on semantic object detection.
-        """
-        rewards = torch.zeros(self.num_envs, device=self.device)
-        # detection_results = self.detect_semantic_objects()
-        # 
-        reward = 0
-
-        # if detection_results['forklift'].get('visible'):
-        #     coverage = detection_results['forklift'].get('coverage_percentage', 0)
-        #     coverage_reward = self.cfg.forklift_reward_scale * coverage
-        #     reward += coverage_reward
-        # Add distance-based reward to uninspected objects
-        distance_reward = self._get_distance_reward()
-        reward += distance_reward
-
-        rewards[0] = reward
-    
-        return rewards
     
     def _get_rewards(self) -> torch.Tensor:
         
         # return  torch.ones(self.num_envs, device=self.device)
-        return self.get_semantic_reward()
+        # return self.get_semantic_reward()
+        face_discovery_reward = self._compute_face_discovery_reward()
+        
+        # Get reward based on distance to a target objective
+        distance_reward = self._get_distance_reward()
+        
+        # Combine the rewards
+        total_reward = self.cfg.forklift_reward_scale * face_discovery_reward + distance_reward
+        return total_reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         self.robot_pos = self.robot.data.root_pos_w
@@ -306,6 +256,9 @@ class Isaac3dinspectionEnv(DirectRLEnv):
     def _reset_idx(self, env_ids: Sequence[int] | None):
         if env_ids is None:
             env_ids = self.robot._ALL_INDICES
+        if env_ids:
+            self.discovered_faces_buffer[env_ids] = False
+            self.total_faces_discovered[env_ids] = 0
         super()._reset_idx(env_ids)
 
         # Sample random positions within specified range
@@ -314,7 +267,7 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         new_pos = torch.zeros((num_resets, 3), device=self.device)
         # new_pos[:, 0] = 0.0  # Fixed X position
         # new_pos[:, 1] = 0.0  # Fixed Y position  
-        new_pos[:, 0] = -12  # Fixed X position
+        new_pos[:, 0] = 0  # Fixed X position
         new_pos[:, 1] = 0.0  # Fixed Y position  
         new_pos[:, 2] = 0.01  # Fixed Z position (adjust height as needed)
         
