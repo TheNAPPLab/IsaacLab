@@ -62,7 +62,6 @@ def main():
         with torch.inference_mode():
             # sample actions from -1 to 1
             actions =  torch.zeros(env.action_space.shape, device=env.unwrapped.device)
-
             #actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
             # apply actions
             obs, rewards, terminated, truncated, info  = env.step(actions)

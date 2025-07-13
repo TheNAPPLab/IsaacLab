@@ -70,12 +70,32 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         if debug:
             print(f"✅ Tracking {len(self.target_prim_map)} target objects: {self.target_object_names}")
         self._setup_semantics()
+        self._setup_tensor_buffers()
 
     def close(self):
         """Cleanup for the environment."""
         super().close()
 
-            
+    def _setup_tensor_buffers(self):
+        """Pre-allocate all tensors to avoid memory allocation during runtime."""
+        height = self.cfg.tiled_camera.height
+        width = self.cfg.tiled_camera.width
+        num_envs = self.num_envs
+        
+        # Camera data buffers (reused every frame)
+        self.rgb_buffer = torch.zeros((num_envs, height, width, 3), 
+                                     dtype=torch.float32, device=self.device)
+        # Buffers for mean calculation (avoid creating new tensors)
+        self.mean_buffer = torch.zeros((num_envs, 1, 1, 3), 
+                                      dtype=torch.float32, device=self.device)
+        
+        # Observation buffer (final output)
+        self.obs_buffer = torch.zeros((num_envs, height, width, 3), 
+                                     dtype=torch.float32, device=self.device)
+        
+        # If you add semantic detection back later:
+        self.semantic_buffer = torch.zeros((num_envs, height, width, 4), 
+                                          dtype=torch.uint8, device=self.device)
     def _setup_semantics(self):
         """Setup semantic tags using the semantic manager."""
         try:
@@ -110,50 +130,47 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         }
 
         semantic_info = self._tiled_camera.data.info.get("semantic_segmentation")
-        image_data = self._tiled_camera.data.output.get("semantic_segmentation")
+        if semantic_info is None:
+            return {}
+        # self.semantic_buffer.copy_(semantic_info)
 
-        if semantic_info is None or image_data is None:
-            if debug:
-                print("⚠️ Warning: Semantic info or image data not available this frame.")
-            return detection_results
+        # if not semantic_info or "idToLabels" not in semantic_info:
+        #     return detection_results  # Skip if no mapping info for this environment
+        # id_to_labels = semantic_info["idToLabels"]
 
-        if not semantic_info or "idToLabels" not in semantic_info:
-            return detection_results  # Skip if no mapping info for this environment
-        id_to_labels = semantic_info["idToLabels"]
+        # class_to_color = {}
 
-        class_to_color = {}
+        # for color_str, label_dict in id_to_labels.items():
+        #     class_name = label_dict.get("class")
+        #     if class_name:
+        #         # The key is a string "(R, G, B, A)", convert it to a tuple of numbers
+        #         color_tuple = eval(color_str)
+        #         # Create a tensor for the color, matching the image's data type (usually uint8)
+        #         color_tensor = torch.tensor(color_tuple, dtype=torch.uint8, device=self.device)
+        #         class_to_color[class_name] = color_tensor
 
-        for color_str, label_dict in id_to_labels.items():
-            class_name = label_dict.get("class")
-            if class_name:
-                # The key is a string "(R, G, B, A)", convert it to a tuple of numbers
-                color_tuple = eval(color_str)
-                # Create a tensor for the color, matching the image's data type (usually uint8)
-                color_tensor = torch.tensor(color_tuple, dtype=torch.uint8, device=self.device)
-                class_to_color[class_name] = color_tensor
+        # # 4. For each target object, check for its color in the image
+        # for object_name in self.target_object_names:
+        #     target_color = class_to_color.get(object_name)
 
-        # 4. For each target object, check for its color in the image
-        for object_name in self.target_object_names:
-            target_color = class_to_color.get(object_name)
+        #     # Proceed only if the target object was found in the color map
+        #     if target_color is not None:
+        #         # Create a boolean mask where the image pixel color matches the target color.
+        #         # torch.all() checks for equality across the RGBA channel dimension.
+        #         mask = torch.all(image_data == target_color, dim=-1)
+        #         pixel_count = torch.sum(mask).item()
 
-            # Proceed only if the target object was found in the color map
-            if target_color is not None:
-                # Create a boolean mask where the image pixel color matches the target color.
-                # torch.all() checks for equality across the RGBA channel dimension.
-                mask = torch.all(image_data == target_color, dim=-1)
-                pixel_count = torch.sum(mask).item()
+        #         if pixel_count > 0:
+        #             total_pixels = mask.numel()
+        #             coverage_percentage = (pixel_count / total_pixels) * 100
 
-                if pixel_count > 0:
-                    total_pixels = mask.numel()
-                    coverage_percentage = (pixel_count / total_pixels) * 100
-
-                    # Update the results with the found data
-                    detection_results[object_name] = {
-                        'visible': True,
-                        'pixel_count': pixel_count,
-                        'coverage_percentage': coverage_percentage,
-                        'bbox': None
-                    }
+        #             # Update the results with the found data
+        #             detection_results[object_name] = {
+        #                 'visible': True,
+        #                 'pixel_count': pixel_count,
+        #                 'coverage_percentage': coverage_percentage,
+        #                 'bbox': None
+        #             }
 
         return detection_results
     
@@ -181,7 +198,6 @@ class Isaac3dinspectionEnv(DirectRLEnv):
             if debug:
                 print(f"Failed to save inspection image: {e}")
 
-    
     def _setup_scene(self):
         #Add robot, camera and terain to the scene
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -199,9 +215,7 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         # we need to explicitly filter collisions for CPU simulation
         if self.device == "cpu":
             self.scene.filter_collisions(global_prim_paths=[])
-        # add articulation to scen
 
-        # add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
 
@@ -232,14 +246,13 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         # self.robot_pos = self.robot.data.root_pos_w
         rgb_data = self._tiled_camera.data.output.get("rgb")
         if rgb_data is not None:
-            rgb_img = rgb_data/255.0  # Shape: [H, W, 4] (RGBA)
-            #normalise 
-            mean_tensor = torch.mean(rgb_img, dim=(1, 2), keepdim=True)
-            rgb_img -= mean_tensor
-            # rgb_img = torch.nn.functional.interpolate(rgb_img.permute(2,0,1).unsqueeze(0), size=(64, 64)).squeeze(0).permute(1,2,0)
-            observations = {"policy": rgb_img.clone()}
+            self.rgb_buffer.copy_(rgb_data)
+            del rgb_data
+            torch.div(self.rgb_buffer, 255.0, out=self.rgb_buffer)
+            torch.mean(self.rgb_buffer, dim=(1, 2), keepdim=True, out=self.mean_buffer)
+            torch.sub(self.rgb_buffer, self.mean_buffer, out=self.obs_buffer)
+            observations = {"policy": self.obs_buffer.clone()}
         return observations
-            
     
     def _get_distance_reward(self) -> float:
         """NEW: Calculate distance-based reward to uninspected objects."""
@@ -258,14 +271,14 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         Calculate rewards based on semantic object detection.
         """
         rewards = torch.zeros(self.num_envs, device=self.device)
-        env_ids = self.robot._ALL_INDICES
-        detection_results = self.detect_semantic_objects()
+        # detection_results = self.detect_semantic_objects()
+        # 
         reward = 0
 
-        if detection_results['forklift'].get('visible'):
-            coverage = detection_results['forklift'].get('coverage_percentage', 0)
-            coverage_reward = self.cfg.forklift_reward_scale * coverage
-            reward += coverage_reward
+        # if detection_results['forklift'].get('visible'):
+        #     coverage = detection_results['forklift'].get('coverage_percentage', 0)
+        #     coverage_reward = self.cfg.forklift_reward_scale * coverage
+        #     reward += coverage_reward
         # Add distance-based reward to uninspected objects
         distance_reward = self._get_distance_reward()
         reward += distance_reward

@@ -38,6 +38,7 @@ class RayCasterCamera(RayCaster):
     - ``"distance_to_camera"``: An image containing the distance to camera optical center.
     - ``"distance_to_image_plane"``: An image containing distances of 3D points from camera plane along camera's z-axis.
     - ``"normals"``: An image containing the local surface normal vectors at each pixel.
+    - ``"face_IDs"``: An image containing the local surface face IDs at each pixel.
 
     .. note::
         Currently, only static meshes are supported. Extending the warp mesh to support dynamic meshes

@@ -19,7 +19,7 @@ from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.terrains import TerrainImporterCfg
 from gymnasium.spaces.discrete import Discrete
 # from isaaclab.sensors.camera import CameraCfg
-from isaaclab.sensors import TiledCameraCfg
+from isaaclab.sensors import TiledCameraCfg, RayCasterCameraCfg
 from .semantic_manager import SemanticManager
 from gymnasium import spaces
 ROBOT_CONFIGS = {
@@ -66,12 +66,18 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         debug_vis=False
     
     )
+    raycast_camera = RayCasterCameraCfg(
+        prim_path="/World/envs/env_.*/Robot/base_link/raycast_camera",
+        update_period=0.1,
+        data_types=["face_id"],
+    )
     tiled_camera = TiledCameraCfg(
         prim_path="/World/envs/env_.*/Robot/base_link/front_camera",
         update_period=0.1,
         height=64,
         width=64,
-        data_types=["rgb", "semantic_segmentation", "instance_segmentation_fast"],
+        # data_types=["rgb", "semantic_segmentation", "instance_segmentation_fast"],
+        data_types=["rgb"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0,
             focus_distance=400.0,
@@ -97,6 +103,7 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         prim_path="/World/ground",
         terrain_type="usd",
         usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Warehouse/full_warehouse.usd",
+        # usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Warehouse/warehouse_with_forklifts.usd",
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(),
         debug_vis=False,
