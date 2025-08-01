@@ -22,7 +22,10 @@ gym.register(
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": f"{__name__}.inspection_env:Isaac3dinspectionEnvCfg",
-        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_camera_ppo_cfg.yaml",
-        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_camera_ppo_cfg.yaml",
+        #"rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_camera_ppo_cfg.yaml", #rl_games_states_ppo_cfg
+         "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_states_ppo_cfg.yaml",
+        # "skrl_cfg_entry_point": f"{agents.__name__}:skrl_camera_ppo_cfg_continous.yaml",
+         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_camera_ppo_rnn.yaml",
+        # "skrl_cfg_entry_point": f"{agents.__name__}:skrl_states_ppo_cfg.yaml"
     },
 )

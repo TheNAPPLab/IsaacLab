@@ -10,24 +10,35 @@ source/isaaclab_tasks/isaaclab_tasks/direct/robot_inspection/run_direct_rl_env.p
 ```
 To run Training with SKRL
 ```
+./isaaclab.sh -p scripts/reinforcement_learning/skrl/train_l.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless
 ./isaaclab.sh -p scripts/reinforcement_learning/skrl/train.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --headless --video
 ```
 View training Logs
 ```
 ./isaaclab.sh -p -m tensorboard.main --logdir logs/skrl/3DInspection_direct
 ```
-
 View Trained Trajectory
 ```
 ./isaaclab.sh -p scripts/reinforcement_learning/skrl/play.py --task Isaac-Inspection-Camera-Direct-v0 --num_envs 1 --use_last_checkpoint
 ```
-
+conda env remove --name env_isaacsim
 # Reward Design
 # First Version
 Simple Reward function
 $reward = \alpha * \frac{1}{1+d} + \beta * \text{Number of Segementation pixels in camera view}$
 
 Drive the reward to a goal and capture the pixels.
+# Second Verison
+
+Enironment setup is much easier using a mostly empty warehouse with Two forklifts.
+
+Using the Ray Caster Camera we can detct FACES given a Mesh and was able to extract the IDS, using this as a Reward function
+$reward = \alpha * \text{Number of new FACE IDS} + \beta * \text{Distance Moved from origin} + \phi \text{Time Penalty}$
+
+Training was unstable
+![PLOT V2](Images/plot_v2.png)
+
+Scaling the Number of face 
 
 # Environmental Setup
 I have a jackal with a RBG and Segementation Camera,

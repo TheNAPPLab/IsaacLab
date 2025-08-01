@@ -20,6 +20,7 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 
 # parser.add_argument("--task", type=str, default="Isaac-Cartpole-RGB-Camera-Direct-v0", help="Name of the task.")
 parser.add_argument("--task", type=str, default="Isaac-Inspection-Camera-Direct-v0", help="Name of the task.")
+# parser.add_argument("--task", type=str, default="Isaac-Velocity-Rough-Anymal-C-Direct-v0", help="Name of the task.")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -37,8 +38,6 @@ import torch
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import parse_env_cfg
 
-# PLACEHOLDER: Extension template (do not remove this comment)
-
 
 def main():
     """Random actions agent with Isaac Lab environment."""
@@ -55,21 +54,25 @@ def main():
     print(f"[INFO]: Gym observation space: {env.observation_space}")
     print(f"[INFO]: Gym action space: {env.action_space}")
     # reset environment
+
     env.reset()
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
             # sample actions from -1 to 1
-            actions =  torch.zeros(env.action_space.shape, device=env.unwrapped.device)
-            #actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
+            # actions = env.action_space.sample()
+            actions = torch.tensor([[0.3, -1.0]], device=env.unwrapped.device) 
+            # actions = torch.from_numpy(actions).to(env.unwrapped.device)
+            # print(f"Actions: {actions}")
+            # actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
             # apply actions
             obs, rewards, terminated, truncated, info  = env.step(actions)
             obs_v = obs['policy']
 
 
     # close the simulator
-    env.close()
+    env.close() 
 
 
 if __name__ == "__main__":

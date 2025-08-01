@@ -18,14 +18,14 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Play a checkpoint of an RL agent from skrl.")
-parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
-parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
+parser.add_argument("--video", action="store_true", default=True, help="Record videos during training.")
+parser.add_argument("--video_length", type=int, default=3000, help="Length of the recorded video (in steps).")
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
+parser.add_argument("--task", type=str, default="Isaac-Inspection-Camera-Direct-v0", help="Name of the task.")
+parser.add_argument("--checkpoint", type=str, default="/home/tosin/Desktop/IsaacLab/scripts/reinforcement_learning/skrl/logs/skrl/3DInspection_direct/2025-07-25_22-50-32_ppo_torch_continous_ppo/checkpoints/best_agent.pt", help="Path to model checkpoint.")
 parser.add_argument(
     "--use_pretrained_checkpoint",
     action="store_true",
@@ -175,6 +175,7 @@ def main():
     # reset environment
     obs, _ = env.reset()
     timestep = 0
+    total_rewards = 0
     # simulate environment
     while simulation_app.is_running():
         start_time = time.time()
@@ -190,11 +191,14 @@ def main():
             else:
                 actions = outputs[-1].get("mean_actions", outputs[0])
             # env stepping
-            obs, _, _, _, _ = env.step(actions)
+            obs, rewards, _, _, _ = env.step(actions)
+            total_rewards += rewards.sum()
         if args_cli.video:
             timestep += 1
             # exit the play loop after recording one video
             if timestep == args_cli.video_length:
+                print(f"[INFO] Finished recording video after {timestep} steps.")
+                print(f"[INFO] Total rewards: {total_rewards}")
                 break
 
         # time delay for real-time evaluation

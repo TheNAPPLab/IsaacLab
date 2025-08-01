@@ -9,11 +9,11 @@ from isaaclab.utils import configclass
 
 
 @configclass
-class CartpolePPORunnerCfg(RslRlOnPolicyRunnerCfg):
+class RobotInspectionPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 1
     max_iterations = 150
     save_interval = 50
-    experiment_name = "I"
+    experiment_name = "robot_inspection"
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,

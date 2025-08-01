@@ -23,7 +23,7 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with skrl.")
-parser.add_argument("--video", action="store_true", default=True, help="Record videos during training.")
+parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
 parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
@@ -51,11 +51,12 @@ parser.add_argument(
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# parse the arguments``
 args_cli, hydra_args = parser.parse_known_args()
 # always enable cameras to record video
 if args_cli.video:
     args_cli.enable_cameras = True
+args_cli.enable_cameras = True
 args_cli.headless = True
 
 # clear out sys.argv for Hydra
