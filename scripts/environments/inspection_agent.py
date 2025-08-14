@@ -56,19 +56,58 @@ def main():
     # reset environment
 
     env.reset()
+    # 
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
             # sample actions from -1 to 1
             # actions = env.action_space.sample()
-            actions = torch.tensor([[0.3, -1.0]], device=env.unwrapped.device) 
-            # actions = torch.from_numpy(actions).to(env.unwrapped.device)
-            # print(f"Actions: {actions}")
-            # actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
-            # apply actions
-            obs, rewards, terminated, truncated, info  = env.step(actions)
-            obs_v = obs['policy']
+            # discrete actions the turn action 1
+            # move forward then turn 
+            # TURN_ACTION = 2
+            MOVE_ACTION = 0
+            turn_steps = 100
+            move_steps = 500
+            current_step = 0
+            def move_forward():
+                return torch.tensor([[MOVE_ACTION]], device=env.unwrapped.device)
+            def turn_left():
+                return torch.tensor([[2]], device=env.unwrapped.device)
+            def turn_right():
+                return torch.tensor([[1]], device=env.unwrapped.device)
+            
+            for i in range(3000):
+            
+                # if i < 240:
+                #     actions = turn_left()
+                # else:
+                actions = move_forward()
+                # move forward
+                # elif i >= 300 and i < 400:
+                #     actions = turn_left()
+                # elif i >= 400 and i < 700:
+                #     actions = move_forward()
+                # elif i >= 700 and i < 800:
+                #     actions = turn_left()
+                # elif i >= 800 and i < 1100:
+                #     actions = move_forward()
+                # elif i >= 1100 and i < 1200:
+                #     actions = turn_left()
+                # else:
+                #     actions = move_forward()
+
+
+
+                # actions = torch.tensor([[0.3, -1.0]], device=env.unwrapped.device)
+                # actions = torch.from_numpy(actions).to(env.unwrapped.device)
+                # print(f"Actions: {actions}")
+                # actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
+                # apply actions
+                # action = move_forward()
+                obs, rewards, terminated, truncated, info  = env.step(actions)
+                obs_v = obs['policy']
+            #now 
 
 
     # close the simulator
