@@ -79,23 +79,20 @@ def main():
             
             for i in range(3000):
             
-                # if i < 240:
-                #     actions = turn_left()
-                # else:
-                actions = move_forward()
-                # move forward
-                # elif i >= 300 and i < 400:
-                #     actions = turn_left()
-                # elif i >= 400 and i < 700:
-                #     actions = move_forward()
-                # elif i >= 700 and i < 800:
-                #     actions = turn_left()
-                # elif i >= 800 and i < 1100:
-                #     actions = move_forward()
-                # elif i >= 1100 and i < 1200:
-                #     actions = turn_left()
-                # else:
-                #     actions = move_forward()
+                if i < 300:
+                    actions = move_forward()
+                elif i >= 300 and i < 400:
+                    actions = turn_left()
+                elif i >= 400 and i < 700:
+                    actions = move_forward()
+                elif i >= 700 and i < 800:
+                    actions = turn_left()
+                elif i >= 800 and i < 1100:
+                    actions = move_forward()
+                elif i >= 1100 and i < 1200:
+                    actions = turn_left()
+                else:
+                    actions = move_forward()
 
 
 

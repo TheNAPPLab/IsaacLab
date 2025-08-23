@@ -36,10 +36,29 @@ ROBOT_CONFIGS = {
         "action_space": 2  # 2 wheels
     },
 }
+Env_params = {
+    "Brick":{
+        "num_faces": 12_000,
+        "semantics_name": "Brick",
+        "file_name": "/home/tosin/Desktop/IsaacLab/environments/ware_house_semantic.usd",
+        "prim_path": "/World/ground/terrain/ware_house_brick/_61_foam_brick"
+    },
+
+    'Brick_default':{
+        "num_faces": 12_000,
+        "semantics_type": "class",
+        "semantics_name": "brick",
+        "file_name": "/home/tosin/Desktop/IsaacLab/environments/ware_house_brick.usd",
+        "prim_path": "/World/ground/terrain/_61_foam_brick",
+
+    }
+
+}
 
 @configclass
 class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     # env
+    env_parameters = Env_params["Brick_default"]
     use_camera_obs: bool = True
     _width, _height = 100, 100
     #mapping
@@ -49,8 +68,8 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
     _map_x_width = int(np.ceil((_map_x_upper - _map_x_lower) / _map_resolution))
     _map_y_width = int(np.ceil((_map_y_upper - _map_y_lower) / _map_resolution))
 
-    inspection_objective_prim_path = "/World/ground/terrain/forklift"
-    inspection_objective_prim_path = "/World/ground/terrain/_61_foam_brick"
+    # inspection_objective_prim_path = "/World/ground/terrain/forklift"
+    inspection_objective_prim_path = env_parameters["prim_path"]
 
 
     decimation = 2
@@ -108,7 +127,7 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         update_period=0.1,
         height=_height,
         width=_width,
-        data_types=["rgb", "distance_to_image_plane"],
+        data_types=["distance_to_image_plane"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0,
             focus_distance=400.0,
@@ -128,7 +147,7 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         update_period=0.1,
         height=_height,
         width=_width,
-        data_types=["rgb", "semantic_segmentation"],
+        data_types=["rgb", "semantic_segmentation", "distance_to_image_plane"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0,
             focus_distance=400.0,
@@ -178,13 +197,12 @@ class Isaac3dinspectionEnvCfg(DirectRLEnvCfg):
         "cameras": spaces.Box(low=float("-inf"), high=float("inf"), shape=(_height, _height, 6)),
         'occupancy_map': spaces.Box(low=0.0, high=1.0, shape=(_map_x_width, _map_y_width, 1))
     })
-        
-
 
     terrain_cfg: TerrainImporterCfg = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="usd",
-        usd_path="/home/tosin/Desktop/IsaacLab/environments/small_forklift.usd",
+        # usd_path="/home/tosin/Desktop/IsaacLab/environments/small_forklift.usd",
+        usd_path= env_parameters["file_name"],
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(),
         debug_vis=False,

@@ -35,8 +35,10 @@ from isaaclab.utils.math import quat_mul
 from isaaclab.utils.math import quat_apply
 # from semantic_manager import SemanticManager, add_semantic_tags_from_config
 from .inspection_cfg import Isaac3dinspectionEnvCfg
-from .occupancy_map import OccupancyMap2D
+from .map2d import Map2D
 import wandb
+
+
 
 try:
     import Semantics
@@ -46,7 +48,7 @@ import omni.usd
 from pxr import UsdGeom, Gf
 #View logs
 
-debug = False
+debug = True
 use_wandb = not debug
 
 
@@ -66,11 +68,12 @@ class Isaac3dinspectionEnv(DirectRLEnv):
          
         self._setup_tensor_buffers()
 
-        self.occupancy_map = OccupancyMap2D(
+        self.map2d = Map2D(
             self.cfg._map_x_lower, self.cfg._map_y_lower,
             self.cfg._map_x_upper, self.cfg._map_y_upper,
             resolution=self.cfg._map_resolution)
         self.last_map_entropy = 0.0
+        self.last_visible_areas = 0.0
 
     def close(self):
         """Cleanup for the environment."""
@@ -91,7 +94,19 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         self.difficulty_increment = 0.05
         self.success_rate = 0.0
 
-       
+        # Add Prim
+    def _add_semantics(self):
+        if self.cfg.env_parameters["semantics_type"] is not None:
+            self.stage = stage_utils.get_current_stage()
+            prim_path = self.cfg.env_parameters["prim_path"]
+            prim = self.stage.GetPrimAtPath(prim_path)
+            if not prim.IsValid():
+                print(f"WARNING: Prim at {prim_path} not found")
+                return False
+            instance_name = f"{self.cfg.env_parameters['semantics_type']}_{self.cfg.env_parameters['semantics_name']}"
+            sem = Semantics.SemanticsAPI.Apply(prim, instance_name)
+            sem.CreateSemanticTypeAttr().Set(self.cfg.env_parameters['semantics_type'])
+            sem.CreateSemanticDataAttr().Set(self.cfg.env_parameters['semantics_name'])
     def _setup_scene(self):
         #Add robot, camera and terain to the scene
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -121,6 +136,8 @@ class Isaac3dinspectionEnv(DirectRLEnv):
 
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
+
+        self._add_semantics()
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         self.actions = actions.clone()
@@ -183,7 +200,34 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         # print(f"[INFO] Wheel Commands: {self.wheel_commands.clone()}")
         self.robot.set_joint_velocity_target(target, joint_ids=self._wheel_joint_indices)
 
-    def _update_map(self):
+    def _update_visibility_map(self):
+        if "distance_to_image_plane" in self.cfg.inspection_camera.data_types:
+            robot_pos = self.robot.data.root_pos_w[0, :]
+            robot_quat = self.robot.data.root_quat_w[0, :]  # (w, x, y, z)
+
+            inspection_camera_local_pos = torch.tensor(self.cfg.inspection_camera.offset.pos, device=self.device)
+            inspection_camera_local_quat = torch.tensor(self.cfg.inspection_camera.offset.rot, device=self.device)
+
+            rotated_offset = quat_apply(robot_quat, inspection_camera_local_pos)
+            camera_world_pos = robot_pos + rotated_offset
+
+            camera_world_quat = quat_mul(robot_quat, inspection_camera_local_quat)
+            
+            robot_quat_w = self.robot.data.root_state_w[0, 3:7]
+            inspection_camera_local_quat_ros = self._inspection_camera.data.quat_w_ros[0]
+            camera_world_quat = quat_mul(robot_quat_w, inspection_camera_local_quat_ros)
+            pointcloud = create_pointcloud_from_depth(
+                intrinsic_matrix=self._inspection_camera.data.intrinsic_matrices[0],
+                depth=self._inspection_camera.data.output["distance_to_image_plane"][0],
+                position=camera_world_pos, #self._obs_camera.data.pos_w[0],
+                orientation= camera_world_quat,
+                device=self.device,
+            )
+            front_points_3d_world_np = pointcloud.cpu().numpy()
+            robot_pos_np = self.robot_pos[0, :3].cpu().numpy()
+            self.map2d.update_visibility_map(front_points_3d_world_np, robot_pos_np)
+           
+    def _update_occupancy_map(self):
         if "distance_to_image_plane" in self.cfg.observation_camera.data_types:
             robot_pos = self.robot.data.root_pos_w[0, :]
             robot_quat = self.robot.data.root_quat_w[0, :]  # (w, x, y, z)
@@ -202,7 +246,7 @@ class Isaac3dinspectionEnv(DirectRLEnv):
             pointcloud = create_pointcloud_from_depth(
                 intrinsic_matrix=self._obs_camera.data.intrinsic_matrices[0],
                 depth=self._obs_camera.data.output["distance_to_image_plane"][0],
-                position=camera_world_pos, #self._obs_camera.data.pos_w[0],
+                position=camera_world_pos,
                 orientation= camera_world_quat,
                 device=self.device,
             )
@@ -214,12 +258,18 @@ class Isaac3dinspectionEnv(DirectRLEnv):
             # print(f"[INFO] Point Cloud Size: {pointcloud.size()}")
             front_points_3d_world_np = pointcloud.cpu().numpy()
             robot_pos_np = self.robot_pos[0, :3].cpu().numpy()
-            self.occupancy_map.update_map(front_points_3d_world_np, robot_pos_np)
-            if debug:
-                self.occupancy_map.display_map(robot_pos_np)
+            self.map2d.update_occupancy_map(front_points_3d_world_np, robot_pos_np)
+
+    def _update_map(self):
+        robot_pos_np = self.robot_pos[0, :3].cpu().numpy()
+        self._update_visibility_map()
+        self._update_occupancy_map()
+        if debug:
+            self.map2d.display_map(robot_pos_np)
 
     def _get_observations(self) -> dict:
         self._update_map()
+
         if  "rgb" in self.cfg.observation_camera.data_types:
             front_camera_data = self._obs_camera.data.output[ "rgb"] / 255.0
             # normalize the camera data for better training results
@@ -231,6 +281,11 @@ class Isaac3dinspectionEnv(DirectRLEnv):
             side_camera_data -= side_mean
 
             combined_camera_data = torch.cat([front_camera_data, side_camera_data], dim=-1)
+        # Depth information is enough from front camera
+        elif "distance_to_image_plane" in self.cfg.observation_camera.data_types:
+            front_camera_data = self._obs_camera.data.output["distance_to_image_plane"]
+            front_camera_data[front_camera_data == float("inf")] = 0
+
 
         occ_map_np = self.occupancy_map.get_map_single_channel()
         # Shape to (N, H, W, C)
@@ -290,7 +345,7 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         forklift_id = -1
         for ids in class_ids:
             _dict = class_ids[ids]
-            if _dict['class'] == 'forklift':
+            if _dict['class'] == self.cfg.env_parameters["semantics_name"]:
                 forklift_id = int(ids)
                 break
 
@@ -350,17 +405,25 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         information_gain = max(0.0, information_gain)
         self.last_map_entropy = current_map_entropy
         return information_gain
-
+    
+    def _compute_visibility_reward(self):
+        current_visible_areas = self.occupancy_map.get_visibility_map()
+        information_gain = self.last_visible_areas - current_visible_areas
+        information_gain = max(0.0, information_gain)
+        self.last_visible_areas = current_visible_areas
+        return information_gain
+    
     def _get_rewards(self) -> torch.Tensor:
         face_discovery_reward = self._compute_face_discovery_reward()
         exploration_reward = self.compute_exploration_reward()
+        visibility_reward = self._compute_visibility_reward()
         num_faces_inspected = len(self.discovered_faces_buffer)
         coverage_ratio = num_faces_inspected / self.cfg.max_faces_to_inspect
         success_bonus = self.cfg.coverage_reward if coverage_ratio >= self.cfg.inspection_threshold else 0.0
 
         total_reward = (self.cfg.inspection_coverage_reward_scale * face_discovery_reward
                         + self.cfg.information_gain_reward_scale * exploration_reward
-                        + success_bonus
+                        +success_bonus
                         + self.cfg.time_penalty
                         )
         return torch.tensor([total_reward], device=self.device)
@@ -433,14 +496,21 @@ class Isaac3dinspectionEnv(DirectRLEnv):
         # Set FIXED robot position instead of random sampling
         new_pos = torch.zeros((num_resets, 3), device=self.device)
 
+        #Brick Env
+
+        # new_pos[:, 0] = -13.0  # Fixed X position
+        # new_pos[:, 1] = 27.6  # Fixed Y position
+        # new_pos[:, 2] = 0.01  # Fixed Z position (adjust height as needed)
+
+        # Forklift Env
         # new_pos[:, 0] = -13.0  # Fixed X position
         # new_pos[:, 1] = 27.6  # Fixed Y position
         # new_pos[:, 2] = 0.01  # Fixed Z position (adjust height as needed)
 
         # next to the Goal
-        new_pos[:, 0] = -13.0  # Fixed X position
-        new_pos[:, 1] = 5.0  # Fixed Y position
-        new_pos[:, 2] = 0.01  # Fixed Z position 
+        # new_pos[:, 0] = -13.0  # Fixed X position
+        # new_pos[:, 1] = 5.0  # Fixed Y position
+        # new_pos[:, 2] = 0.01  # Fixed Z position 
 
         #outside wall
         # new_pos[:, 0] = -35.0  # Fixed X position
